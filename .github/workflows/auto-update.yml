@@ -1,0 +1,64 @@
+name: auto-update
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux/archlinux:latest
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm git makepkg curl jq openssh
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/checkout@v4
+      - name: Check upstream release
+        id: latest
+        run: |
+          set -euo pipefail
+          tag="$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/repos/Map1en/VRCX-0/releases/latest | jq -r .tag_name)"
+          ver="${tag#v}"
+          cur="$(sed -n "s/^pkgver='//p" PKGBUILD | sed "s/'\$//")"
+          echo "version=${ver}" >> "$GITHUB_OUTPUT"
+          if [ "$ver" = "$cur" ]; then
+            echo "out_of_date=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "out_of_date=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Bump version
+        if: steps.latest.outputs.out_of_date == 'true'
+        env:
+          AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          ver="${{ steps.latest.outputs.version }}"
+          deb="VRCX-0_${ver}_linux_x86_64.deb"
+          curl -fL -o "${deb}" "https://github.com/Map1en/VRCX-0/releases/download/v${ver}/${deb}"
+          sha="$(sha256sum "${deb}" | awk '{print $1}')"
+          rm -f "${deb}"
+          sed -i "s/^pkgver=.*/pkgver='${ver}'/" PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${sha}')/" PKGBUILD
+          makepkg --printsrcinfo > .SRCINFO
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to ${ver}"
+          git push origin HEAD
+          # Push to AUR (pinned host key, deploy key from secrets)
+          mkdir -p ~/.ssh
+          printf 'aur.archlinux.org AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN\n' > ~/.ssh/known_hosts
+          printf '%s\n' "${AUR_SSH_KEY}" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          GIT_SSH_COMMAND="ssh -i ${HOME}/.ssh/aur_key -o IdentitiesOnly=yes" \
+            git push ssh://aur@aur.archlinux.org/vrcx-0-bin.git HEAD:master
