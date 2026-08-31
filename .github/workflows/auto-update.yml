@@ -19,7 +19,7 @@ jobs:
       image: archlinux/archlinux:latest
     steps:
       - name: Install tools
-        run: pacman -Syu --noconfirm git makepkg curl jq openssh
+        run: pacman -Syu --noconfirm git devtools curl jq openssh
       - name: Git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/checkout@v4
