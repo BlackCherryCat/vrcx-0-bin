@@ -26,7 +26,9 @@ jobs:
           sudo usermod -aG wheel builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
       - name: Git safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          sudo chown -R builder:builder "$GITHUB_WORKSPACE"
       - uses: actions/checkout@v4
       - name: Check upstream release
         id: latest
