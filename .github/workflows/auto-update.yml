@@ -27,7 +27,7 @@ jobs:
         id: latest
         run: |
           set -euo pipefail
-          tag="$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/repos/Map1en/VRCX-0/releases/latest | jq -r .tag_name)"
+          tag="$(curl -fsSL https://api.github.com/repos/Map1en/VRCX-0/releases/latest | jq -r .tag_name)"
           ver="${tag#v}"
           cur="$(sed -n "s/^pkgver='//p" PKGBUILD | sed "s/'\$//")"
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
