@@ -19,7 +19,12 @@ jobs:
       image: archlinux/archlinux:latest
     steps:
       - name: Install tools
-        run: pacman -Syu --noconfirm git devtools curl jq openssh
+        run: |
+          pacman -Syu --noconfirm git devtools curl jq openssh
+          # Create a non-root user for building
+          sudo useradd -m builder
+          sudo usermod -aG wheel builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers
       - name: Git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/checkout@v4
@@ -49,7 +54,7 @@ jobs:
           rm -f "${deb}"
           sed -i "s/^pkgver=.*/pkgver='${ver}'/" PKGBUILD
           sed -i "s/^sha256sums=.*/sha256sums=('${sha}')/" PKGBUILD
-          makepkg --printsrcinfo > .SRCINFO
+          sudo -u builder makepkg --printsrcinfo > .SRCINFO
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PKGBUILD .SRCINFO
