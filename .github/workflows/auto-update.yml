@@ -59,23 +59,13 @@ jobs:
           sudo -u builder makepkg --printsrcinfo > .SRCINFO
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add PKGBUILD<LeftMouse> .SRCINFO
+          git add PKGBUILD .SRCINFO
           git commit -m "Update to ${ver}"
           git push origin HEAD
-  aur_push:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Publish AUR package
-        uses: KSXGitHub/github-actions-deploy-aur@v4.2.0
-        with:
-          pkgname: vrcx-0-bin
-          pkgbuild: ./PKGBUILD
-          commit_username: github-actions[bot]
-          commit_email: 41898282+github-actions[bot]@users.noreply.github.com
-          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
-          commit_message: Update AUR package
-          ssh_keyscan_types: rsa,ecdsa,ed25519
+          # Push to AUR (pinned host key, deploy key from secrets)
+          mkdir -p ~/.ssh
+          printf 'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' > ~/.ssh/known_hosts
+          printf '%s\n' "${AUR_SSH_KEY}" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o IdentitiesOnly=yes" \
+            git push ssh://aur@aur.archlinux.org/vrcx-0-bin.git HEAD:master
